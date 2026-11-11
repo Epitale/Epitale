@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    function isMember(hid) {
+      return signedIn() &&
+        request.auth.uid in get(/databases/$(database)/documents/households/$(hid)).data.memberIds;
+    }
+
+    // Profil : chacun ne voit que le sien
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Codes d'invitation : lisibles uniquement un par un (pas de listing)
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn();
+    }
+
+    match /households/{hid} {
+      allow create: if signedIn() && request.resource.data.memberIds == [request.auth.uid];
+      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
+
+      allow update: if signedIn() && (
+        // déjà membre
+        request.auth.uid in resource.data.memberIds ||
+        // rejoint un foyer d'1 personne avec un code valide (max 2 membres)
+        (resource.data.memberIds.size() == 1 &&
+         request.resource.data.memberIds.size() == 2 &&
+         request.resource.data.memberIds.hasAll(resource.data.memberIds) &&
+         request.auth.uid in request.resource.data.memberIds &&
+         get(/databases/$(database)/documents/invites/$(request.resource.data.joinCode)).data.householdId == hid)
+      );
+
+      // tâches, événements, courses
+      match /{col}/{docId} {
+        allow read, write: if isMember(hid);
+      }
+    }
+  }
+}
