@@ -7,18 +7,18 @@ export function Shopping() {
   const todo = s.items.filter((i) => !i.done).sort((a, b) => a.createdAt - b.createdAt)
   const done = s.items.filter((i) => i.done).sort((a, b) => b.createdAt - a.createdAt)
 
-  const add = async () => {
+  const add = () => {
     const t = text.trim()
     if (!t) return
     setText('')
-    await s.addItem(t)
+    s.addItem(t)
   }
 
   return (
     <>
       <div className="add-row">
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ajouter un article…" onKeyDown={(e) => e.key === 'Enter' && add()} enterKeyHint="done" />
-        <button className="btn primary" onClick={add} disabled={!text.trim()}>＋</button>
+        <button className="btn primary" onClick={add} disabled={!text.trim()} style={{ padding: "0 18px" }}>＋</button>
       </div>
       <div className="list">
         {todo.map((i) => (
@@ -29,7 +29,7 @@ export function Shopping() {
           </div>
         ))}
       </div>
-      {!todo.length && <div className="empty"><span className="big">🛒</span>La liste est vide.</div>}
+      {!todo.length && <div className="empty">La liste est vide. Ajoute ce qu'il manque 🛒</div>}
       {done.length > 0 && (
         <section className="section">
           <div className="section-title"><span>Dans le panier · {done.length}</span><button className="link" style={{ margin: 0 }} onClick={() => s.clearDoneItems()}>Vider</button></div>

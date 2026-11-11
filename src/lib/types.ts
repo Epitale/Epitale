@@ -10,16 +10,20 @@ export interface Member {
 
 export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly'
 
-export type Domain = 'bebe' | 'sante' | 'maison' | 'courses' | 'admin' | 'famille' | 'autre'
+/** Domaine (catégorie) : intégré ou créé par vous. */
+export interface DomainDef {
+  id: string
+  label: string
+  color: string
+  builtin?: boolean
+}
 
-export const DOMAINS: Record<Domain, { label: string; emoji: string }> = {
-  bebe: { label: 'Bébé', emoji: '🍼' },
-  sante: { label: 'Santé', emoji: '🩺' },
-  maison: { label: 'Maison', emoji: '🏠' },
-  courses: { label: 'Courses', emoji: '🛒' },
-  admin: { label: 'Admin', emoji: '📄' },
-  famille: { label: 'Famille', emoji: '👨‍👩‍👧' },
-  autre: { label: 'Autre', emoji: '📌' },
+/** Étape d'une tâche (sous-tâche). `assignee: null` = hérite de la tâche. */
+export interface Step {
+  id: string
+  title: string
+  done: boolean
+  assignee: Assignee | null
 }
 
 export interface Task {
@@ -30,8 +34,11 @@ export interface Task {
   createdBy: string
   createdAt: number
   deadline: string | null // YYYY-MM-DD
-  domain: Domain
+  domain: string // id de DomainDef
   recurrence: Recurrence
+  steps: Step[]
+  /** Événement à l'origine de cette tâche (liste « À préparer ») */
+  eventId: string | null
   done: boolean
   doneAt: number | null
   doneBy: string | null
@@ -44,8 +51,10 @@ export interface CalEvent {
   who: Assignee
   createdBy: string
   createdAt: number
-  date: string // YYYY-MM-DD
-  time: string | null // HH:MM, null = toute la journée
+  date: string // début, YYYY-MM-DD
+  endDate: string | null // fin (inclus) si l'événement dure plusieurs jours
+  time: string | null // HH:MM ; null = toute la journée
+  endTime: string | null
 }
 
 export interface ShopItem {
@@ -54,6 +63,14 @@ export interface ShopItem {
   done: boolean
   addedBy: string
   createdAt: number
+}
+
+/** Liste type : modèle de checklist pour « À préparer ». */
+export interface Template {
+  id: string
+  name: string
+  domain: string
+  steps: string[]
 }
 
 export type NewTask = Omit<Task, 'id' | 'createdAt' | 'createdBy' | 'done' | 'doneAt' | 'doneBy'>
@@ -78,17 +95,24 @@ export interface Store {
   tasks: Task[]
   events: CalEvent[]
   items: ShopItem[]
+  domains: DomainDef[]
+  templates: Template[]
+  /** Dernier problème de synchro (affiché à l'écran, utile sans console sur téléphone) */
+  syncError: string | null
   auth: AuthApi | null
-  addTask(t: NewTask): Promise<void>
-  updateTask(id: string, patch: Partial<Task>): Promise<void>
-  removeTask(id: string): Promise<void>
-  addEvent(e: NewEvent): Promise<void>
-  updateEvent(id: string, patch: Partial<CalEvent>): Promise<void>
-  removeEvent(id: string): Promise<void>
-  addItem(text: string): Promise<void>
-  updateItem(id: string, patch: Partial<ShopItem>): Promise<void>
-  removeItem(id: string): Promise<void>
-  clearDoneItems(): Promise<void>
+  addTask(t: NewTask): string
+  updateTask(id: string, patch: Partial<Task>): void
+  removeTask(id: string): void
+  addEvent(e: NewEvent): string
+  updateEvent(id: string, patch: Partial<CalEvent>): void
+  removeEvent(id: string): void
+  addItem(text: string): void
+  updateItem(id: string, patch: Partial<ShopItem>): void
+  removeItem(id: string): void
+  clearDoneItems(): void
+  addDomain(label: string, color: string): string
+  removeDomain(id: string): void
+  saveTemplates(list: Template[]): void
   /** mode local uniquement : « jouer » l'autre personne pour tester */
   switchUser?(): void
 }

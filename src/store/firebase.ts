@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
+import { connectAuthEmulator, getAuth } from 'firebase/auth'
+import { connectFirestoreEmulator, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
 
 const env = import.meta.env
 import { firebaseConfigured } from './config'
@@ -21,3 +21,9 @@ export const auth = app ? getAuth(app) : (null as never)
 export const db = app
   ? initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) })
   : (null as never)
+
+// Développement : `VITE_FIREBASE_EMULATOR=1` pointe l'app sur les émulateurs locaux (voir README).
+if (app && env.VITE_FIREBASE_EMULATOR) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true })
+  connectFirestoreEmulator(db, '127.0.0.1', 8080)
+}

@@ -9,6 +9,6 @@ export function useStore(): Store {
   return s
 }
 
-export const MEMBER_COLORS = ['#6c5ce7', '#ff7a59']
-export const BOTH_COLOR = '#14b8a6'
+export const MEMBER_COLORS = ['#B84A25', '#2F7A66']
+export const BOTH_COLOR = '#C28A1B'
 export const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
