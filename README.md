@@ -1,7 +1,14 @@
 # Epitale 🧡 — notre quotidien à deux
 
-PWA gratuite pour partager la charge mentale à deux : tâches (à moi / à elle / à deux, deadline, récurrence),
-planning de RDV, liste de courses, et un écran « Aujourd'hui » qui dit à chacun ce qu'il a à faire.
+PWA gratuite pour partager la charge mentale à deux :
+
+- **Tâches** (à moi / à elle / à deux, deadline, récurrence) avec **étapes** : on peut tout valider d'un coup via la tâche
+  principale, ou seulement une ou deux étapes ; chaque étape peut avoir son responsable.
+- **Domaines** (Bébé, Santé, Maison…) et création de vos propres domaines en un geste.
+- **Planning** : rendez-vous à l'heure, « toute la journée » ou **sur plusieurs jours** (barres continues).
+- **« À préparer »** : sur un événement, choisis une **liste type** (Ménage maison, Affaires pour partir, Courses de la
+  semaine…) : elle devient automatiquement une tâche avec ses étapes. Supprimer l'événement supprime ses tâches.
+- **Listes types** modifiables dans Réglages. **Courses** partagées. Écran **Aujourd'hui** (« Elle t'a laissé ça »).
 
 ## Essayer tout de suite (mode démo)
 
@@ -46,3 +53,15 @@ Le plan gratuit Firebase (Spark) est très largement suffisant pour 2 personnes.
 ## Prochaine étape possible
 
 Notifications push (Firebase Cloud Messaging + Cloud Function) pour les deadlines et les assignations.
+
+## Tester la synchro en local (émulateur Firebase)
+
+```bash
+npx firebase-tools emulators:start --only auth,firestore --project demo-epitale   # nécessite Java
+VITE_FIREBASE_API_KEY=x VITE_FIREBASE_PROJECT_ID=demo-epitale VITE_FIREBASE_EMULATOR=1 npm run dev
+```
+
+## En cas de souci de synchro
+
+Un bandeau rouge « Souci de synchro (code) » apparaît en haut de l'écran avec le code d'erreur Firestore, et
+Réglages → « Synchro » l'indique aussi (pratique sur téléphone, sans console).

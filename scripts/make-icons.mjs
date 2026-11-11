@@ -11,7 +11,7 @@ const browser = await chromium.launch()
 for (const [file, size, scale] of targets) {
   const page = await browser.newPage({ viewport: { width: size, height: size } })
   const inner = Math.round(size * scale), off = Math.round((size - inner) / 2)
-  await page.setContent(`<body style="margin:0;background:#6c5ce7"><div style="position:absolute;left:${off}px;top:${off}px;width:${inner}px;height:${inner}px">${svg.replace('<svg ', `<svg width="${inner}" height="${inner}" `)}</div></body>`)
+  await page.setContent(`<body style="margin:0;background:#B84A25"><div style="position:absolute;left:${off}px;top:${off}px;width:${inner}px;height:${inner}px">${svg.replace('<svg ', `<svg width="${inner}" height="${inner}" `)}</div></body>`)
   await page.screenshot({ path: `public/${file}` })
   await page.close()
 }

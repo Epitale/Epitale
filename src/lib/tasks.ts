@@ -50,3 +50,16 @@ export const sortTasks = (a: Task, b: Task) => {
   if (!a.deadline && b.deadline) return 1
   return a.createdAt - b.createdAt
 }
+
+// ── Étapes ───────────────────────────────────────────────────────────
+export const hasSteps = (t: Task) => t.steps.length > 0
+export const stepsDone = (t: Task) => t.steps.filter((s) => s.done).length
+export const progress = (t: Task) => (t.steps.length ? stepsDone(t) / t.steps.length : t.done ? 1 : 0)
+
+/** Qui s'occupe d'une étape ? (hérite de la tâche si non précisé) */
+export const stepOwner = (t: Task, s: { assignee: Assignee | null }) => s.assignee ?? t.assignee
+
+/** Valeurs par défaut pour les anciens documents (avant l'arrivée des étapes). */
+export function normTask(t: Task): Task {
+  return { ...t, steps: t.steps ?? [], eventId: t.eventId ?? null, domain: t.domain ?? 'autre' }
+}
