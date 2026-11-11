@@ -1,4 +1,4 @@
-# Epitale 🧡 — notre quotidien à deux
+# Matibault 🧡 — notre quotidien à deux
 
 PWA gratuite pour partager la charge mentale à deux : tâches (à moi / à elle / à deux, deadline, récurrence),
 planning de RDV, liste de courses, et un écran « Aujourd'hui » qui dit à chacun ce qu'il a à faire.
