@@ -2,8 +2,8 @@ import { useState } from 'react'
 import type { Task } from '../lib/types'
 import { useStore } from '../store/context'
 import { assigneeLabel, hasSteps, stepOwner, stepsDone } from '../lib/tasks'
-import { diffDays, relativeDate, todayISO } from '../lib/dates'
 import { DomainTag, OwnerAvatar } from './ui'
+import { CountdownChip } from './CountdownChip'
 import { Icon } from './Icon'
 import { useTaskActions } from '../store/actions'
 
@@ -11,7 +11,6 @@ export function TaskItem({ task, onOpen, isNew }: { task: Task; onOpen: () => vo
   const { members, me } = useStore()
   const { toggleTask, toggleStep, cycleOwner } = useTaskActions()
   const [open, setOpen] = useState(false)
-  const late = !task.done && task.deadline && diffDays(task.deadline, todayISO()) < 0
   const creator = members.find((m) => m.id === task.createdBy)
   const n = task.steps.length, d = stepsDone(task)
   const part = !task.done && d > 0
@@ -27,9 +26,9 @@ export function TaskItem({ task, onOpen, isNew }: { task: Task; onOpen: () => vo
         <div className="t-title">{task.title}</div>
         <div className="meta">
           <span className="who"><OwnerAvatar who={task.assignee} />{assigneeLabel(task.assignee, members, me?.id)}</span>
-          {task.deadline && <span className={late ? 'late' : ''}>{relativeDate(task.deadline)}</span>}
+          <CountdownChip task={task} />
           <DomainTag id={task.domain} />
-          {task.recurrence !== 'none' && <span title="Récurrente">↻</span>}
+          {task.recurrence !== 'none' && <span title="Récurrente">{task.rotate ? '↻ à tour de rôle' : '↻'}</span>}
           {hasSteps(task) && <span className="count">{d} sur {n}</span>}
           {isNew && creator && <span className="new-badge">de {creator.name}</span>}
         </div>

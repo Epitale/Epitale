@@ -8,9 +8,12 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import { StoreContext, MEMBER_COLORS, uid } from './context'
-import type { CalEvent, DomainDef, Member, ShopItem, Store, Task, Template } from '../lib/types'
+import type { CalEvent, DomainDef, Info, Meal, Member, ShopItem, Store, Task, Template } from '../lib/types'
 import { BUILTIN_DOMAINS, DEFAULT_TEMPLATES } from '../lib/defaults'
-import { normTask } from '../lib/tasks'
+import { fillTask, normTask } from '../lib/tasks'
+import { makePushApi, type PushDoc } from './push'
+import { fillEvent, normEvent } from '../lib/events'
+import { DEFAULT_HABITS, guessAisle } from '../lib/aisles'
 
 interface Household {
   code: string
@@ -18,6 +21,7 @@ interface Household {
   names: Record<string, string>
   domains?: DomainDef[]
   templates?: Template[]
+  habits?: string[]
 }
 
 const genCode = () => {
@@ -40,7 +44,12 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([])
   const [events, setEvents] = useState<CalEvent[]>([])
   const [items, setItems] = useState<ShopItem[]>([])
+  const [meals, setMeals] = useState<Meal[]>([])
+  const [infos, setInfos] = useState<Info[]>([])
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [userDoc, setUserDoc] = useState<PushDoc | null>(null)
+  const [loaded, setLoaded] = useState<string[]>([])
+  const mark = useCallback((k: string) => setLoaded((l) => (l.includes(k) ? l : [...l, k])), [])
   const [retry, setRetry] = useState(0)
 
   /** Les écritures ne bloquent jamais l'écran : une erreur s'affiche dans la bannière. */
@@ -55,14 +64,15 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     return onSnapshot(
       doc(db, 'users', user.uid),
       { includeMetadataChanges: true },
-      (s) => { if (!s.metadata.hasPendingWrites) setHid((s.data()?.householdId as string) ?? null) },
+      (s) => { setUserDoc((s.data() as PushDoc | undefined) ?? null); if (!s.metadata.hasPendingWrites) setHid((s.data()?.householdId as string) ?? null) },
       (e) => { setSyncError(`profil : ${errText(e)}`); setHid(null) },
     )
   }, [user])
 
   // Données du foyer en temps réel, avec reprise automatique en cas d'erreur
   useEffect(() => {
-    if (!hid) { setHousehold(null); return }
+    if (!hid) { setHousehold(null); setLoaded([]); return }
+    setLoaded([])
     const base = doc(db, 'households', hid)
     let timer: ReturnType<typeof setTimeout> | undefined
     const fail = (what: string) => (e: unknown) => {
@@ -72,10 +82,12 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     }
     const ok = () => setSyncError(null)
     const unsubs = [
-      onSnapshot(base, (s) => { ok(); setHousehold(s.exists() ? (s.data() as Household) : null) }, fail('foyer')),
-      onSnapshot(query(collection(base, 'tasks')), (s) => { ok(); setTasks(s.docs.map((d) => normTask({ ...(d.data() as Task), id: d.id }))) }, fail('tâches')),
-      onSnapshot(query(collection(base, 'events')), (s) => { ok(); setEvents(s.docs.map((d) => { const e = d.data() as CalEvent; return { ...e, id: d.id, endDate: e.endDate ?? null, endTime: e.endTime ?? null } })) }, fail('événements')),
-      onSnapshot(query(collection(base, 'items')), (s) => { ok(); setItems(s.docs.map((d) => ({ ...(d.data() as ShopItem), id: d.id }))) }, fail('courses')),
+      onSnapshot(base, (s) => { ok(); mark('household'); setHousehold(s.exists() ? (s.data() as Household) : null) }, fail('foyer')),
+      onSnapshot(query(collection(base, 'tasks')), (s) => { ok(); mark('tasks'); setTasks(s.docs.map((d) => normTask({ ...(d.data() as Task), id: d.id }))) }, fail('tâches')),
+      onSnapshot(query(collection(base, 'events')), (s) => { ok(); mark('events'); setEvents(s.docs.map((d) => normEvent({ ...(d.data() as CalEvent), id: d.id }))) }, fail('événements')),
+      onSnapshot(query(collection(base, 'items')), (s) => { ok(); mark('items'); setItems(s.docs.map((d) => { const i = d.data() as ShopItem; return { ...i, id: d.id, aisle: i.aisle ?? guessAisle(i.text) } })) }, fail('courses')),
+      onSnapshot(query(collection(base, 'meals')), (s) => { ok(); mark('meals'); setMeals(s.docs.map((d) => ({ ...(d.data() as Meal), id: d.id, ingredients: (d.data() as Meal).ingredients ?? [] }))) }, fail('repas')),
+      onSnapshot(query(collection(base, 'infos')), (s) => { ok(); mark('infos'); setInfos(s.docs.map((d) => ({ ...(d.data() as Info), id: d.id }))) }, fail('infos')),
     ]
     return () => { clearTimeout(timer); unsubs.forEach((u) => u()) }
   }, [hid, retry])
@@ -97,8 +109,8 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       : !hid ? 'needsHousehold'
       : !household ? 'loading' : 'ready'
 
-    const create = (name: string, data: object) => {
-      const ref = doc(col(name))
+    const create = (name: string, data: object, id?: string) => {
+      const ref = id ? doc(col(name), id) : doc(col(name))
       setDoc(ref, clean({ ...data, createdAt: Date.now() })).catch(report('enregistrement'))
       return ref.id
     }
@@ -111,7 +123,10 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       me,
       members,
       householdCode: household?.code ?? null,
-      tasks, events, items,
+      tasks, events, items, meals, infos,
+      habits: household?.habits ?? DEFAULT_HABITS,
+      push: user ? makePushApi(user.uid, userDoc, report('notifications')) : null,
+      synced: ['household', 'tasks', 'events', 'items', 'meals', 'infos'].every((k) => loaded.includes(k)),
       domains: [...BUILTIN_DOMAINS, ...customDomains],
       templates: household?.templates ?? DEFAULT_TEMPLATES,
       syncError,
@@ -147,13 +162,16 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
           await setDoc(doc(db, 'users', u.uid), { name, householdId })
         },
       },
-      addTask: (t) => create('tasks', { ...t, createdBy: meId, done: false, doneAt: null, doneBy: null }),
+      addTask: (t, id) => {
+        if (id && tasks.some((x) => x.id === id)) return id // déjà créée (tâche automatique)
+        return create('tasks', { ...fillTask(t), createdBy: meId, done: false, doneAt: null, doneBy: null }, id)
+      },
       updateTask: (id, p) => patch('tasks', id, p),
       removeTask: (id) => remove('tasks', id),
-      addEvent: (e) => create('events', { ...e, createdBy: meId }),
+      addEvent: (e) => create('events', { ...fillEvent(e), createdBy: meId }),
       updateEvent: (id, p) => patch('events', id, p),
       removeEvent: (id) => remove('events', id),
-      addItem: (text) => { create('items', { text, done: false, addedBy: meId }) },
+      addItem: (text, aisle) => { create('items', { text, aisle: aisle ?? guessAisle(text), done: false, addedBy: meId }) },
       updateItem: (id, p) => patch('items', id, p),
       removeItem: (id) => remove('items', id),
       clearDoneItems: () => {
@@ -163,6 +181,13 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
           return batch.commit()
         }).catch(report('suppression'))
       },
+      addMeal: (m) => create('meals', m),
+      updateMeal: (id, p) => patch('meals', id, p),
+      removeMeal: (id) => remove('meals', id),
+      addInfo: (i) => create('infos', i),
+      updateInfo: (id, p) => patch('infos', id, p),
+      removeInfo: (id) => remove('infos', id),
+      setHabits: (list) => { updateDoc(hRef(), { habits: list }).catch(report('habituels')) },
       addDomain: (label, color) => {
         const id = 'd-' + uid()
         updateDoc(hRef(), { domains: [...customDomains, { id, label, color }] }).catch(report('domaine'))
@@ -171,7 +196,7 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       removeDomain: (id) => { updateDoc(hRef(), { domains: customDomains.filter((d) => d.id !== id) }).catch(report('domaine')) },
       saveTemplates: (list) => { updateDoc(hRef(), { templates: list }).catch(report('listes types')) },
     }
-  }, [user, hid, household, tasks, events, items, syncError, report])
+  }, [user, hid, household, tasks, events, items, meals, infos, syncError, loaded, userDoc, report])
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
 }

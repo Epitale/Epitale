@@ -1,6 +1,6 @@
-import { addDays, addMonths, todayISO, diffDays } from './dates'
-import type { Task, Recurrence, Member, Assignee } from './types'
-import { BOTH } from './types'
+import { addDays, addMonths, todayISO, diffDays, fromISO } from './dates'
+import type { Task, Recurrence, Member, Assignee, NewTask } from './types'
+import { BOTH, NONE } from './types'
 
 export const RECURRENCE_LABEL: Record<Recurrence, string> = {
   none: 'Jamais',
@@ -42,7 +42,7 @@ export function bucketOf(t: Task): Bucket {
 export const concerns = (assignee: Assignee, meId: string) => assignee === meId || assignee === BOTH
 
 export const assigneeLabel = (a: Assignee, members: Member[], meId: string | undefined) =>
-  a === BOTH ? 'À deux' : a === meId ? 'Moi' : members.find((m) => m.id === a)?.name ?? '?'
+  a === BOTH ? 'À deux' : a === NONE ? 'À prendre' : a === meId ? 'Moi' : members.find((m) => m.id === a)?.name ?? '?'
 
 export const sortTasks = (a: Task, b: Task) => {
   if (a.deadline && b.deadline && a.deadline !== b.deadline) return a.deadline < b.deadline ? -1 : 1
@@ -61,5 +61,57 @@ export const stepOwner = (t: Task, s: { assignee: Assignee | null }) => s.assign
 
 /** Valeurs par défaut pour les anciens documents (avant l'arrivée des étapes). */
 export function normTask(t: Task): Task {
-  return { ...t, steps: t.steps ?? [], eventId: t.eventId ?? null, domain: t.domain ?? 'autre' }
+  const rec = t.recurrence ?? 'none'
+  return {
+    ...t, recurrence: rec, steps: t.steps ?? [], eventId: t.eventId ?? null, domain: t.domain ?? 'autre',
+    // avant l'arrivée des échéances : une tâche répétée est « le jour J », les autres « avant le »
+    dateMode: t.dateMode ?? (rec !== 'none' ? 'on' : 'before'),
+    remindDays: t.remindDays ?? null, plannedOn: t.plannedOn ?? null, rotate: t.rotate ?? false,
+    thankedBy: t.thankedBy ?? [], auto: t.auto ?? false,
+  }
 }
+
+/** Complète une nouvelle tâche avec les valeurs par défaut. */
+export function fillTask(t: NewTask) {
+  return {
+    ...t, dateMode: t.dateMode ?? 'before', remindDays: t.remindDays ?? null, plannedOn: t.plannedOn ?? null,
+    rotate: t.rotate ?? false, thankedBy: t.thankedBy ?? [], auto: t.auto ?? false,
+  }
+}
+
+// ── Échéances : compte à rebours ──────────────────────────────────────
+export type Urgency = 'calm' | 'soon' | 'hot' | 'last' | 'day' | 'late'
+export interface Countdown { label: string; urgency: Urgency; flag: boolean }
+
+const fWd = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' })
+const fDm = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
+
+/**
+ * « Avant le » : compte à rebours (J-5, J-2, Dernier jour) de plus en plus pressant.
+ * « Le jour J » : simple date, sans urgence.
+ */
+export function countdown(t: Pick<Task, 'deadline' | 'dateMode' | 'done'>): Countdown | null {
+  if (!t.deadline) return null
+  const d = diffDays(t.deadline, todayISO())
+  const dt = fromISO(t.deadline)
+  if (t.dateMode === 'on') {
+    if (d < 0) return { label: d === -1 ? 'Hier' : `${fDm.format(dt)}`, urgency: 'late', flag: false }
+    return { label: d === 0 ? "Aujourd'hui" : d === 1 ? 'Demain' : d < 7 ? fWd.format(dt) : fDm.format(dt), urgency: 'day', flag: false }
+  }
+  if (d < 0) return { label: `En retard de ${-d} j`, urgency: 'late', flag: true }
+  if (d === 0) return { label: 'Dernier jour', urgency: 'last', flag: true }
+  const wd = fWd.format(dt)
+  return { label: d <= 6 ? `J-${d} · avant ${wd}` : `J-${d}`, urgency: d <= 2 ? 'hot' : d <= 5 ? 'soon' : 'calm', flag: true }
+}
+
+/** À finir dès maintenant (échéance dans les 14 jours) ? */
+export const isDueSoon = (t: Task, today = todayISO()) =>
+  t.dateMode === 'before' && !!t.deadline && t.deadline >= today && diffDays(t.deadline, today) <= 14
+
+export const isOverdue = (t: Task, today = todayISO()) => !!t.deadline && t.deadline < today
+
+/** Prévue pour aujourd'hui (jour précis, ou « je m'y mets le… ») ? */
+export const isPlannedToday = (t: Task, today = todayISO()) =>
+  (t.dateMode === 'on' && t.deadline === today) || t.plannedOn === today
+
+export const isFree = (t: Task) => t.assignee === NONE

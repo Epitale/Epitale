@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Assignee, DomainDef, Member } from '../lib/types'
-import { BOTH } from '../lib/types'
+import { BOTH, NONE } from '../lib/types'
 import { BOTH_COLOR, useStore } from '../store/context'
 import { DOMAIN_COLORS } from '../lib/defaults'
 import { Icon } from './Icon'
@@ -31,21 +31,21 @@ export function Avatar({ member, size }: { member: Member; size?: 'lg' }) {
 }
 
 export const colorOf = (a: Assignee, members: Member[]) =>
-  a === BOTH ? BOTH_COLOR : members.find((m) => m.id === a)?.color ?? '#999'
+  a === BOTH ? BOTH_COLOR : a === NONE ? '#8A8076' : members.find((m) => m.id === a)?.color ?? '#999'
 
 /** Pastille ronde du responsable (initiale, ou « 2 » pour À deux). */
 export function OwnerAvatar({ who, onClick, label }: { who: Assignee; onClick?: () => void; label?: string }) {
   const { members } = useStore()
   const m = members.find((x) => x.id === who)
-  const props = { className: `av ${onClick ? 'btn-av' : ''}`, style: { background: colorOf(who, members) } }
-  const text = who === BOTH ? '2' : (m?.name ?? '?').slice(0, 1).toUpperCase()
+  const props = { className: `av ${onClick ? 'btn-av' : ''} ${who === NONE ? 'none' : ''}`, style: who === NONE ? undefined : { background: colorOf(who, members) } }
+  const text = who === BOTH ? '2' : who === NONE ? '?' : (m?.name ?? '?').slice(0, 1).toUpperCase()
   return onClick
     ? <button type="button" {...props} aria-label={label ?? 'Changer le responsable'} onClick={(e) => { e.stopPropagation(); onClick() }}>{text}</button>
     : <span {...props}>{text}</span>
 }
 
 /** Choix « qui ? » : membres + À deux. */
-export function WhoPicker({ value, onChange, extra }: { value: Assignee; onChange: (a: Assignee) => void; extra?: ReactNode }) {
+export function WhoPicker({ value, onChange, extra, allowNone }: { value: Assignee; onChange: (a: Assignee) => void; extra?: ReactNode; allowNone?: boolean }) {
   const { members, me } = useStore()
   const meId = me!.id
   const ordered = [...members].sort((a) => (a.id === meId ? -1 : 1))
@@ -57,6 +57,7 @@ export function WhoPicker({ value, onChange, extra }: { value: Assignee; onChang
         </button>
       ))}
       <button type="button" className={`chip ${value === BOTH ? 'on' : ''}`} onClick={() => onChange(BOTH)}>À deux</button>
+      {allowNone && <button type="button" className={`chip dash ${value === NONE ? 'on' : ''}`} onClick={() => onChange(NONE)}>À prendre (personne)</button>}
       {extra}
     </div>
   )

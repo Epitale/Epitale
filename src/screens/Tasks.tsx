@@ -3,9 +3,9 @@ import { useStore } from '../store/context'
 import { bucketOf, sortTasks, type Bucket } from '../lib/tasks'
 import { TaskItem } from '../components/TaskItem'
 import { TaskForm } from '../components/TaskForm'
-import { BOTH, type Task } from '../lib/types'
+import { BOTH, NONE, type Task } from '../lib/types'
 
-type Filter = 'me' | 'other' | 'both' | 'all'
+type Filter = 'me' | 'other' | 'both' | 'free' | 'all'
 
 export function Tasks({ adding, onCloseAdd }: { adding: boolean; onCloseAdd: () => void }) {
   const s = useStore()
@@ -18,14 +18,14 @@ export function Tasks({ adding, onCloseAdd }: { adding: boolean; onCloseAdd: () 
 
   const match = (t: Task) =>
     (domain === null || t.domain === domain) &&
-    (filter === 'all' || (filter === 'me' && t.assignee === meId) || (filter === 'other' && t.assignee === other?.id) || (filter === 'both' && t.assignee === BOTH))
+    (filter === 'all' || (filter === 'me' && t.assignee === meId) || (filter === 'other' && t.assignee === other?.id) || (filter === 'both' && t.assignee === BOTH) || (filter === 'free' && t.assignee === NONE))
 
   const open = useMemo(() => s.tasks.filter((t) => !t.done && match(t)).sort(sortTasks), [s.tasks, filter, domain])
   const done = useMemo(() => s.tasks.filter((t) => t.done && match(t)).sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0)).slice(0, 30), [s.tasks, filter, domain])
   const n = (f: (t: Task) => boolean) => s.tasks.filter((t) => !t.done && f(t)).length
 
   const groups: [Bucket, string][] = [['overdue', 'À rattraper'], ['today', "Aujourd'hui"], ['upcoming', 'À venir'], ['nodate', 'Sans date']]
-  const defaultAssignee = filter === 'other' && other ? other.id : filter === 'both' ? BOTH : meId
+  const defaultAssignee = filter === 'other' && other ? other.id : filter === 'both' ? BOTH : filter === 'free' ? NONE : meId
 
   return (
     <>
@@ -33,6 +33,7 @@ export function Tasks({ adding, onCloseAdd }: { adding: boolean; onCloseAdd: () 
         <button className={filter === 'me' ? 'on' : ''} onClick={() => setFilter('me')}>Moi · {n((t) => t.assignee === meId)}</button>
         {other && <button className={filter === 'other' ? 'on' : ''} onClick={() => setFilter('other')}>{other.name} · {n((t) => t.assignee === other.id)}</button>}
         <button className={filter === 'both' ? 'on' : ''} onClick={() => setFilter('both')}>À deux · {n((t) => t.assignee === BOTH)}</button>
+        <button className={filter === 'free' ? 'on' : ''} onClick={() => setFilter('free')}>À prendre{n((t) => t.assignee === NONE) ? ` · ${n((t) => t.assignee === NONE)}` : ''}</button>
         <button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>Tout</button>
       </div>
       <div className="chips row" aria-label="Domaines">

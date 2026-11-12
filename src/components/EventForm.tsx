@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Sheet, WhoPicker } from './ui'
 import { Icon } from './Icon'
 import { uid, useStore } from '../store/context'
-import { BOTH, type CalEvent } from '../lib/types'
+import { BOTH, type CalEvent, type Recurrence } from '../lib/types'
 import { addDays, diffDays, todayISO } from '../lib/dates'
 import { eventDays } from '../lib/events'
 import { useTaskActions } from '../store/actions'
@@ -20,6 +20,7 @@ export function EventForm({ event, date, onClose }: { event?: CalEvent; date?: s
   const [time, setTime] = useState(event?.time ?? '')
   const [endTime, setEndTime] = useState(event?.endTime ?? '')
   const [notes, setNotes] = useState(event?.notes ?? '')
+  const [recurrence, setRecurrence] = useState<Recurrence>(event?.recurrence ?? 'none')
 
   // « À préparer » (création uniquement)
   const [prep, setPrep] = useState<string>('none') // 'none' | id de liste type | 'custom'
@@ -52,7 +53,7 @@ export function EventForm({ event, date, onClose }: { event?: CalEvent; date?: s
       endDate: endD > d ? endD : null,
       time: allDay || !time ? null : time,
       endTime: allDay || !time || !endTime ? null : endTime,
-      notes: notes.trim(),
+      notes: notes.trim(), recurrence,
     }
     if (event) { s.updateEvent(event.id, e); onClose(); return }
     const id = s.addEvent(e)
@@ -95,6 +96,12 @@ export function EventForm({ event, date, onClose }: { event?: CalEvent; date?: s
           <label>Fin<input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} /></label>
         </div>
       )}
+      <label>Répéter
+        <select value={recurrence} onChange={(e) => setRecurrence(e.target.value as Recurrence)}>
+          <option value="none">Jamais</option><option value="weekly">Chaque semaine</option>
+          <option value="monthly">Chaque mois</option><option value="yearly">Chaque année</option>
+        </select>
+      </label>
       <label>Détails (optionnel)<textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
 
       {!event && (

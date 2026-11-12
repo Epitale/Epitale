@@ -5,7 +5,7 @@ import { connectFirestoreEmulator, initializeFirestore, persistentLocalCache, pe
 const env = import.meta.env
 import { firebaseConfigured } from './config'
 
-const app = firebaseConfigured
+export const app = firebaseConfigured
   ? initializeApp({
       apiKey: env.VITE_FIREBASE_API_KEY,
       authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,

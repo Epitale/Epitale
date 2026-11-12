@@ -1,6 +1,6 @@
 import { useStore } from './context'
 import { nextOccurrenceDate } from '../lib/tasks'
-import { BOTH, type CalEvent, type Task } from '../lib/types'
+import { BOTH, NONE, type CalEvent, type Task } from '../lib/types'
 
 /** Actions sur les tâches : validation globale, validation d'une étape, récurrence, suppression d'un événement. */
 export function useTaskActions() {
@@ -10,11 +10,28 @@ export function useTaskActions() {
 
   const respawn = (t: Task) => {
     if (t.recurrence === 'none') return
+    // « Alterner entre nous » : à chaque fois, l'autre prend le relais
+    const assignee = t.rotate && t.assignee !== BOTH && t.assignee !== NONE ? (t.assignee === meId ? otherId : meId) : t.assignee
+    const next = nextOccurrenceDate(t)
     s.addTask({
-      title: t.title, notes: t.notes, assignee: t.assignee, deadline: nextOccurrenceDate(t), domain: t.domain,
+      title: t.title, notes: t.notes, assignee, deadline: next, domain: t.domain, dateMode: t.dateMode,
+      remindDays: t.remindDays, rotate: t.rotate, auto: true,
+      plannedOn: t.plannedOn && t.deadline ? nextOccurrenceDate({ ...t, deadline: t.plannedOn }) : null,
       recurrence: t.recurrence, steps: t.steps.map((x) => ({ ...x, done: false })), eventId: null,
     })
   }
+
+  /** « Je m'en occupe » : prend une tâche qui n'avait pas de responsable. */
+  const claim = (t: Task) => s.updateTask(t.id, { assignee: meId })
+
+  /** Supprime une tâche ; un cadeau automatique est seulement « terminé » pour ne pas être recréé. */
+  const deleteTask = (t: Task) => {
+    if (t.id.startsWith('gift-')) s.updateTask(t.id, { done: true, doneAt: Date.now(), doneBy: meId })
+    else s.removeTask(t.id)
+  }
+
+  /** Dire merci pour une tâche faite par l'autre. */
+  const thank = (t: Task) => { if (!t.thankedBy.includes(meId)) s.updateTask(t.id, { thankedBy: [...t.thankedBy, meId] }) }
 
   /** Coche la tâche principale : valide aussi toutes ses étapes. Décocher rouvre tout. */
   const toggleTask = (t: Task) => {
@@ -47,5 +64,5 @@ export function useTaskActions() {
     s.removeEvent(e.id)
   }
 
-  return { toggleTask, toggleStep, cycleOwner, nextOwner, deleteEvent, meId, otherId, BOTH }
+  return { toggleTask, toggleStep, cycleOwner, nextOwner, deleteEvent, claim, thank, deleteTask, meId, otherId, BOTH }
 }
