@@ -1,0 +1,12 @@
+# Petit programme gratuit qui envoie les notifications d'Epitale toutes les 10 minutes.
+name = "epitale-push"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[vars]
+TIMEZONE = "Europe/Paris"
+# FIREBASE_PROJECT_ID : à renseigner (identique à VITE_FIREBASE_PROJECT_ID)
+# Secret à créer : GOOGLE_SERVICE_ACCOUNT (contenu du fichier JSON de compte de service)
